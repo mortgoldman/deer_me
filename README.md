@@ -29,7 +29,7 @@ Layer 2: Locomotion Engine   Pure Python — gaits, IK, spine, state machine
 Layer 1: Blender Adapter     Reads/writes bone transforms and keyframes via bpy
 ```
 
-**Layer 2 has zero Blender imports.** This is what makes the unit tests fast (~0.4s for 118 tests).
+**Layer 2 has zero Blender imports.** This is what makes the unit tests fast (~0.4s for 147 tests).
 
 ## Project Structure
 
@@ -42,7 +42,12 @@ src/deer_me/
         ik_solver.py    Two-bone IK for leg placement
         spine.py        Procedural spine, neck, and tail dynamics
         interpolation.py  Easing functions, pose blending, splines
-    adapter/        Blender bridge (armature, keyframes, scene)
+        state_machine.py  Locomotion states with cross-fade blending
+    adapter/        Blender bridge (lazy bpy imports — works without Blender)
+        rig.py          Create armature from skeleton, apply/reset poses
+        keyframe.py     Insert pose keyframes, batch fcurve writer
+        scene.py        Ground plane, 3-point lighting, camera
+        skin.py         Mesh binding, proxy deer mesh generator
     api/            Animator-facing commands and sequencer
 tests/
     unit/           Fast tests — no Blender needed
@@ -73,15 +78,21 @@ pip install -e ".[dev]"
 ```bash
 # Unit tests (fast, no Blender needed)
 pytest tests/unit/ -v
+
+# All tests (integration tests auto-skip if Blender not installed)
+pytest tests/ -v
+
+# Integration tests inside Blender (requires Blender 4.x)
+blender --background --python scripts/run_in_blender.py -- pytest tests/integration/ -v
 ```
 
 ## Current Status
 
 - **Phase 1** — Foundation: types, skeleton, interpolation
 - **Phase 2** — Locomotion engine: gaits, IK solver, spine dynamics
-- Phase 3 — State machine and blend transitions (next)
-- Phase 4 — Blender adapter
-- Phase 5 — Animator API
+- **Phase 3** — State machine with cross-fade blending
+- **Phase 4** — Blender adapter (armature, keyframes, scene, skinning)
+- Phase 5 — Animator API (next)
 - Phase 6 — Polish and onboarding
 
 ## The Deer Rig
