@@ -29,21 +29,34 @@ from .gaits import (
     body_pitch,
     compute_foot_target,
 )
+from .ik_solver import solve_two_bone
 from .interpolation import blend_pose, smoothstep
 from .skeleton import (
     FRONT_HOOF_L,
     FRONT_HOOF_R,
     HEAD,
+    LOWER_ARM_L,
+    LOWER_ARM_R,
+    LOWER_LEG_L,
+    LOWER_LEG_R,
     NECK_BASE,
     NECK_MID,
     REAR_HOOF_L,
     REAR_HOOF_R,
     ROOT,
+    SHOULDER_L,
+    SHOULDER_R,
+    HIP_L,
+    HIP_R,
     SPINE_BASE,
     SPINE_MID,
     SPINE_UPPER,
     TAIL_BASE,
     TAIL_TIP,
+    UPPER_ARM_L,
+    UPPER_ARM_R,
+    UPPER_LEG_L,
+    UPPER_LEG_R,
     Skeleton,
 )
 from .spine import (
@@ -405,18 +418,37 @@ class LocomotionStateMachine:
         for bone_name, rot in zip(tail_bones, tail_rots):
             pose.set_rotation(bone_name, rot)
 
-        # Foot targets (store as positions — IK applied by adapter layer)
-        leg_map = {
-            LegId.FRONT_LEFT: FRONT_HOOF_L,
-            LegId.FRONT_RIGHT: FRONT_HOOF_R,
-            LegId.REAR_LEFT: REAR_HOOF_L,
-            LegId.REAR_RIGHT: REAR_HOOF_R,
-        }
-        rest = skeleton.rest_pose()
-        for leg_id, hoof_name in leg_map.items():
-            rest_pos = rest.joints[hoof_name].position
-            target = compute_foot_target(phase, leg_id, params, rest_pos, speed)
-            pose.set_position(hoof_name, target)
+        # Leg IK: compute foot targets in world space, solve IK for rotations
+        leg_configs = [
+            (LegId.FRONT_LEFT, UPPER_ARM_L, LOWER_ARM_L, FRONT_HOOF_L,
+             vec3(0, 1, 0)),   # front knees bend forward
+            (LegId.FRONT_RIGHT, UPPER_ARM_R, LOWER_ARM_R, FRONT_HOOF_R,
+             vec3(0, 1, 0)),
+            (LegId.REAR_LEFT, UPPER_LEG_L, LOWER_LEG_L, REAR_HOOF_L,
+             vec3(0, -1, 0)),  # rear hocks bend backward
+            (LegId.REAR_RIGHT, UPPER_LEG_R, LOWER_LEG_R, REAR_HOOF_R,
+             vec3(0, -1, 0)),
+        ]
+
+        for leg_id, upper_bone, lower_bone, hoof_bone, bend_hint in leg_configs:
+            # World-space rest hoof position (accumulated from root)
+            rest_hoof_world = skeleton.world_position(hoof_bone)
+            # World-space foot target
+            target = compute_foot_target(
+                phase, leg_id, params, rest_hoof_world, speed
+            )
+            pose.set_position(hoof_bone, target)
+
+            # IK root = world position of the upper bone
+            ik_root = skeleton.world_position(upper_bone)
+            upper_len = skeleton.bones[upper_bone].length
+            lower_len = skeleton.bones[lower_bone].length
+
+            ik_result = solve_two_bone(
+                ik_root, target, upper_len, lower_len, bend_axis=bend_hint,
+            )
+            pose.set_rotation(upper_bone, ik_result.upper_rotation)
+            pose.set_rotation(lower_bone, ik_result.lower_rotation)
 
     def _apply_turn(
         self,

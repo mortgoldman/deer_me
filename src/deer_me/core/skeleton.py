@@ -253,6 +253,20 @@ class Skeleton:
             current = self.bones[current].parent
         raise ValueError(f"No chain from {from_bone} to {to_bone}")
 
+    def world_position(self, bone_name: str) -> "Vec3":
+        """Compute the world-space position of a bone by accumulating parent offsets."""
+        chain = []
+        current: Optional[str] = bone_name
+        while current is not None:
+            chain.append(current)
+            current = self.bones[current].parent
+        chain.reverse()
+
+        pos = vec3(0.0, 0.0, 0.0)
+        for name in chain:
+            pos = pos + self.bones[name].rest_position
+        return pos
+
     def rest_pose(self) -> Pose:
         """Return the rest/bind pose (all joints at their default transforms)."""
         pose = Pose()
