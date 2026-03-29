@@ -66,12 +66,13 @@ def insert_pose_keyframe(
         pose_bone.rotation_quaternion = mu.Quaternion((q.w, q.x, q.y, q.z))
         pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame)
 
-        # Location offset
-        pos = joint.position
-        rest_pos = arm_obj.data.bones[bone_name].head_local
-        offset = mu.Vector((float(pos[0]), float(pos[1]), float(pos[2]))) - rest_pos
-        pose_bone.location = offset
-        pose_bone.keyframe_insert(data_path="location", frame=frame)
+        # Location offset — only for bones with explicitly set positions
+        if pose.has_position_change(bone_name):
+            pos = joint.position
+            rest_pos = arm_obj.data.bones[bone_name].head_local
+            offset = mu.Vector((float(pos[0]), float(pos[1]), float(pos[2]))) - rest_pos
+            pose_bone.location = offset
+            pose_bone.keyframe_insert(data_path="location", frame=frame)
 
 
 def insert_pose_sequence(
@@ -134,16 +135,17 @@ def batch_insert_sequence(
             pose_bone.rotation_quaternion = mu.Quaternion((q.w, q.x, q.y, q.z))
             pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame)
 
-            # Location offset
-            pos = joint.position
-            rest_pos = arm_obj.data.bones[bone_name].head_local
-            offset = mu.Vector(
-                (float(pos[0]) - rest_pos[0],
-                 float(pos[1]) - rest_pos[1],
-                 float(pos[2]) - rest_pos[2])
-            )
-            pose_bone.location = offset
-            pose_bone.keyframe_insert(data_path="location", frame=frame)
+            # Location offset — only for bones with explicitly set positions
+            if pose.has_position_change(bone_name):
+                pos = joint.position
+                rest_pos = arm_obj.data.bones[bone_name].head_local
+                offset = mu.Vector(
+                    (float(pos[0]) - rest_pos[0],
+                     float(pos[1]) - rest_pos[1],
+                     float(pos[2]) - rest_pos[2])
+                )
+                pose_bone.location = offset
+                pose_bone.keyframe_insert(data_path="location", frame=frame)
 
 
 def _get_action_fcurves(action) -> list:

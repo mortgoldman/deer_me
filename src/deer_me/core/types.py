@@ -156,9 +156,12 @@ class Pose:
     """Complete pose of the skeleton at a single point in time.
 
     Maps bone name → JointTransform (local-space, relative to parent).
+    Tracks which bones had positions explicitly set (vs rest defaults)
+    so the adapter layer knows which bones need location keyframes.
     """
 
     joints: Dict[str, JointTransform] = field(default_factory=dict)
+    _dirty_positions: set = field(default_factory=set)
 
     def get(self, bone_name: str) -> JointTransform:
         if bone_name not in self.joints:
@@ -170,6 +173,11 @@ class Pose:
 
     def set_position(self, bone_name: str, position: Vec3) -> None:
         self.get(bone_name).position = position.copy()
+        self._dirty_positions.add(bone_name)
+
+    def has_position_change(self, bone_name: str) -> bool:
+        """True if set_position was explicitly called for this bone."""
+        return bone_name in self._dirty_positions
 
 
 # ---------------------------------------------------------------------------

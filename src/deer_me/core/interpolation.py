@@ -107,6 +107,9 @@ def blend_pose(pose_a: Pose, pose_b: Pose, t: float,
         jb = pose_b.joints.get(name, JointTransform())
         result.joints[name] = blend_joint(ja, jb, t_eased)
 
+    # Propagate dirty positions from either source
+    result._dirty_positions = pose_a._dirty_positions | pose_b._dirty_positions
+
     return result
 
 
