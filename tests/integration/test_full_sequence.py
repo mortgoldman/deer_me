@@ -55,11 +55,13 @@ class TestFullSequence:
 
         # Verify
         action = arm_obj.animation_data.action
-        assert len(action.fcurves) > 0
+        from deer_me.adapter.keyframe import _get_action_fcurves
+        fcurves = _get_action_fcurves(action)
+        assert len(fcurves) > 0
 
         # Check that keyframes span the expected range
         all_frames = set()
-        for fc in action.fcurves:
+        for fc in fcurves:
             for kp in fc.keyframe_points:
                 all_frames.add(int(kp.co[0]))
         assert min(all_frames) == 1
@@ -97,7 +99,8 @@ class TestFullSequence:
         batch_insert_sequence(arm_obj, sequence)
 
         action = arm_obj.animation_data.action
-        assert len(action.fcurves) > 0
+        from deer_me.adapter.keyframe import _get_action_fcurves
+        assert len(_get_action_fcurves(action)) > 0
 
     def test_proxy_mesh_binding(self, clean_scene, skeleton):
         """Create armature, proxy mesh, and verify binding."""

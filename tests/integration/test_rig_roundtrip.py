@@ -130,7 +130,8 @@ class TestKeyframeInsertion:
         insert_pose_sequence(arm_obj, sequence)
 
         action = arm_obj.animation_data.action
-        assert len(action.fcurves) > 0
+        from deer_me.adapter.keyframe import _get_action_fcurves
+        assert len(_get_action_fcurves(action)) > 0
 
     def test_batch_insert(self, clean_scene, skeleton):
         from deer_me.adapter.keyframe import batch_insert_sequence
@@ -151,7 +152,8 @@ class TestKeyframeInsertion:
         batch_insert_sequence(arm_obj, sequence)
 
         action = arm_obj.animation_data.action
-        assert len(action.fcurves) > 0
+        from deer_me.adapter.keyframe import _get_action_fcurves
+        assert len(_get_action_fcurves(action)) > 0
 
     def test_clear_keyframes(self, clean_scene, skeleton):
         from deer_me.adapter.keyframe import (

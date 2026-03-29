@@ -69,7 +69,7 @@ scripts/            Blender setup and runner helpers
 ### Requirements
 
 - **Python 3.11+**
-- **Blender 4.x** (for rendering — not needed for core development/testing)
+- **Blender 4.x or 5.x** (for rendering — not needed for core development/testing)
 
 ### Install for Development
 

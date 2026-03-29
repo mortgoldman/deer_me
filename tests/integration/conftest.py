@@ -44,19 +44,26 @@ def _clear_scene():
     if not HAS_BPY:
         return
 
-    bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.object.delete(use_global=False)
+    # Remove all objects directly (avoids operator context issues in background mode)
+    for obj in list(bpy.data.objects):
+        bpy.data.objects.remove(obj, do_unlink=True)
 
     # Clear orphan data
-    for block in bpy.data.meshes:
+    for block in list(bpy.data.meshes):
         if block.users == 0:
             bpy.data.meshes.remove(block)
-    for block in bpy.data.armatures:
+    for block in list(bpy.data.armatures):
         if block.users == 0:
             bpy.data.armatures.remove(block)
-    for block in bpy.data.materials:
+    for block in list(bpy.data.materials):
         if block.users == 0:
             bpy.data.materials.remove(block)
-    for block in bpy.data.actions:
+    for block in list(bpy.data.actions):
         if block.users == 0:
             bpy.data.actions.remove(block)
+    for block in list(bpy.data.cameras):
+        if block.users == 0:
+            bpy.data.cameras.remove(block)
+    for block in list(bpy.data.lights):
+        if block.users == 0:
+            bpy.data.lights.remove(block)

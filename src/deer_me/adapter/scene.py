@@ -51,12 +51,25 @@ def setup_scene(
     scene.frame_end = frame_end
     scene.frame_set(frame_start)
 
+    # EEVEE was renamed across Blender versions:
+    # Blender 4.x: BLENDER_EEVEE_NEXT, Blender 5.x+: BLENDER_EEVEE
+    eevee_candidates = ["BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"]
+
     engine_map = {
-        "EEVEE": "BLENDER_EEVEE_NEXT",
         "CYCLES": "CYCLES",
         "WORKBENCH": "BLENDER_WORKBENCH",
     }
-    scene.render.engine = engine_map.get(engine.upper(), "BLENDER_EEVEE_NEXT")
+
+    if engine.upper() == "EEVEE" or engine.upper() not in engine_map:
+        # Try each EEVEE name until one works
+        for name in eevee_candidates:
+            try:
+                scene.render.engine = name
+                break
+            except TypeError:
+                continue
+    else:
+        scene.render.engine = engine_map[engine.upper()]
 
 
 def clear_default_objects() -> None:
@@ -67,6 +80,17 @@ def clear_default_objects() -> None:
         obj = bpy.data.objects.get(name)
         if obj is not None:
             bpy.data.objects.remove(obj, do_unlink=True)
+
+    # Clean orphaned data blocks
+    for block in list(bpy.data.meshes):
+        if block.users == 0:
+            bpy.data.meshes.remove(block)
+    for block in list(bpy.data.cameras):
+        if block.users == 0:
+            bpy.data.cameras.remove(block)
+    for block in list(bpy.data.lights):
+        if block.users == 0:
+            bpy.data.lights.remove(block)
 
 
 # ---------------------------------------------------------------------------
