@@ -50,20 +50,26 @@ def bind_mesh_to_armature(
     """
     bpy = _bpy()
 
-    # Deselect all, then select mesh and armature
-    bpy.ops.object.select_all(action="DESELECT")
-    mesh_obj.select_set(True)
-    arm_obj.select_set(True)
-    bpy.context.view_layer.objects.active = arm_obj
+    # Parent the mesh to the armature directly (avoids operator context issues)
+    mesh_obj.parent = arm_obj
+    mesh_obj.matrix_parent_inverse = arm_obj.matrix_world.inverted()
 
-    method_map = {
-        "AUTOMATIC": "ARMATURE_AUTO",
-        "ENVELOPE": "ARMATURE_ENVELOPE",
-        "EMPTY": "ARMATURE_NAME",
-    }
-    parent_type = method_map.get(method.upper(), "ARMATURE_AUTO")
+    # Add an armature modifier
+    mod = mesh_obj.modifiers.new(name="Armature", type="ARMATURE")
+    mod.object = arm_obj
 
-    bpy.ops.object.parent_set(type=parent_type)
+    if method.upper() == "EMPTY":
+        return
+
+    # For AUTOMATIC/ENVELOPE, create vertex groups matching bone names
+    # so the armature modifier can deform the mesh
+    for bone in arm_obj.data.bones:
+        if bone.name not in mesh_obj.vertex_groups:
+            mesh_obj.vertex_groups.new(name=bone.name)
+
+    if method.upper() == "AUTOMATIC":
+        # Assign automatic weights based on proximity to bones
+        _assign_automatic_weights(mesh_obj, arm_obj)
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +140,62 @@ def create_proxy_mesh(
         bind_mesh_to_armature(mesh_obj, arm_obj, method="AUTOMATIC")
 
     return mesh_obj
+
+
+def _assign_automatic_weights(
+    mesh_obj: "bpy.types.Object",
+    arm_obj: "bpy.types.Object",
+) -> None:
+    """Assign vertex weights based on proximity to bones.
+
+    A simple nearest-bone approach that doesn't require operator context.
+    Each vertex is assigned to the closest bone with weight based on distance.
+    """
+    mu = _mathutils()
+
+    bone_data = []
+    for bone in arm_obj.data.bones:
+        head = arm_obj.matrix_world @ mu.Vector(bone.head_local)
+        tail = arm_obj.matrix_world @ mu.Vector(bone.tail_local)
+        bone_data.append((bone.name, head, tail))
+
+    mesh_verts = mesh_obj.data.vertices
+
+    for vert in mesh_verts:
+        world_co = mesh_obj.matrix_world @ vert.co
+        weights = []
+
+        for bone_name, head, tail in bone_data:
+            dist = _point_to_segment_dist(world_co, head, tail)
+            if dist < 1e-6:
+                dist = 1e-6
+            weights.append((bone_name, 1.0 / dist))
+
+        # Normalize and keep the top contributors
+        total = sum(w for _, w in weights)
+        weights = [(name, w / total) for name, w in weights]
+        weights.sort(key=lambda x: x[1], reverse=True)
+
+        # Assign top 4 bone influences
+        for bone_name, weight in weights[:4]:
+            if weight > 0.01:
+                vg = mesh_obj.vertex_groups.get(bone_name)
+                if vg:
+                    vg.add([vert.index], weight, "REPLACE")
+
+
+def _point_to_segment_dist(point, seg_start, seg_end) -> float:
+    """Distance from a point to a line segment."""
+    mu = _mathutils()
+
+    seg = mu.Vector(seg_end) - mu.Vector(seg_start)
+    seg_len_sq = seg.length_squared
+    if seg_len_sq < 1e-12:
+        return (mu.Vector(point) - mu.Vector(seg_start)).length
+
+    t = max(0.0, min(1.0, (mu.Vector(point) - mu.Vector(seg_start)).dot(seg) / seg_len_sq))
+    projection = mu.Vector(seg_start) + seg * t
+    return (mu.Vector(point) - projection).length
 
 
 def _proxy_radius(bone_name: str, bone_length: float) -> float:
