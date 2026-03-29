@@ -9,12 +9,17 @@ Deer Me provides a high-level API for creating realistic deer locomotion in Blen
 ```python
 from deer_me.api.deer import Deer
 from deer_me.api.sequence import Sequence
+from deer_me.api import presets
 
-seq = Sequence()
-seq.at(frame=0).walk(speed=1.0)
-seq.at(frame=120).trot(speed=1.5)
-seq.at(frame=240).idle(variation="graze")
-seq.render_to_blender()
+deer = Deer(fps=24)
+seq = Sequence(deer)
+
+seq.at(1).walk(speed=1.0)       # Start walking
+seq.at(120).trot(speed=1.5)     # Speed up to a trot
+seq.at(240).idle()              # Slow to a stop
+
+# One call to bake into Blender (creates scene, armature, mesh, keyframes)
+seq.bake_to_blender()
 ```
 
 The system handles gait cycles, foot placement, spine dynamics, IK solving, and smooth transitions between states automatically.
@@ -53,27 +58,33 @@ src/deer_me/
         sequence.py     Fluent timeline builder for scripted animations
         presets.py      Compound behaviors: graze, startle, flee, patrol
 tests/
-    unit/           Fast tests — no Blender needed
-    integration/    Blender headless tests
+    unit/           Fast tests — no Blender needed (191 tests)
+    integration/    Blender headless tests (15 tests, auto-skipped without bpy)
 examples/           Runnable demo scripts
+scripts/            Blender setup and runner helpers
 ```
 
-## Setup
+## Getting Started
 
 ### Requirements
 
-- Python 3.11+
-- Blender 4.x (for rendering — not needed for core development/testing)
+- **Python 3.11+**
+- **Blender 4.x** (for rendering — not needed for core development/testing)
 
-### Install
+### Install for Development
 
 ```bash
-# Clone the repo
 git clone https://github.com/mortgoldman/deer_me.git
 cd deer_me
-
-# Install in development mode
 pip install -e ".[dev]"
+```
+
+### Set Up Blender (one time)
+
+After installing Blender, run the setup script to install deer_me into Blender's bundled Python:
+
+```bash
+blender --background --python scripts/setup_blender.py
 ```
 
 ### Run Tests
@@ -85,18 +96,86 @@ pytest tests/unit/ -v
 # All tests (integration tests auto-skip if Blender not installed)
 pytest tests/ -v
 
-# Integration tests inside Blender (requires Blender 4.x)
+# Integration tests inside Blender
 blender --background --python scripts/run_in_blender.py -- pytest tests/integration/ -v
 ```
 
-## Current Status
+## Examples
 
-- **Phase 1** — Foundation: types, skeleton, interpolation
-- **Phase 2** — Locomotion engine: gaits, IK solver, spine dynamics
-- **Phase 3** — State machine with cross-fade blending
-- **Phase 4** — Blender adapter (armature, keyframes, scene, skinning)
-- **Phase 5** — Animator API (Deer class, sequencer, presets)
-- Phase 6 — Polish and onboarding (next)
+Three example scripts are included in the `examples/` folder. Run them inside Blender:
+
+### 01 — Basic Walk
+
+A 10-second walk cycle. The simplest possible animation.
+
+```bash
+blender --python examples/01_basic_walk.py
+```
+
+### 02 — Walk and Graze
+
+A deer walks in, slows down, and grazes. Uses the Sequence API and the `graze` preset.
+
+```bash
+blender --python examples/02_walk_and_graze.py
+```
+
+### 03 — Full Sequence: A Day in the Life
+
+A complete 18-second story combining multiple presets:
+1. Cautious approach (slow walk, looking around)
+2. Peaceful grazing
+3. Startle at a noise (freeze)
+4. Flee at full gallop
+
+```bash
+blender --python examples/03_full_sequence.py
+```
+
+## Quick Reference
+
+### Deer Class
+
+```python
+deer = Deer(fps=24)
+
+deer.walk(speed=1.0)      # Lateral sequence gait
+deer.trot(speed=1.3)      # Diagonal pair gait
+deer.gallop(speed=2.0)    # Gathered gallop (must trot first)
+deer.idle()               # Stand still (must slow down from gallop first)
+deer.turn_left(speed=1.0) # Walk-based left turn
+deer.turn_right(speed=1.0)
+
+deer.update(dt)           # Advance by dt seconds
+deer.pose()               # Get current Pose
+deer.bake_to_blender(240) # One-call Blender export
+```
+
+### Sequence API
+
+```python
+seq = Sequence(deer)
+seq.at(0).walk()          # Command at frame 0
+seq.at(120).trot()        # Command at frame 120
+seq.hold(60).idle()       # Wait 60 frames, then idle
+frames = seq.bake()       # Returns [(frame, Pose), ...]
+seq.bake_to_blender()     # Direct Blender export
+```
+
+### Presets
+
+```python
+from deer_me.api import presets
+
+seq = Sequence(deer)
+seq.at(0)
+presets.graze(seq, duration_frames=120)       # Walk slowly, then graze
+presets.startle(seq, pause_frames=18)         # Alert freeze
+presets.flee(seq, duration_frames=96)         # Walk → trot → gallop
+presets.look_around(seq, duration_frames=96)  # Turn left → right → forward
+presets.patrol(seq, duration_frames=240)      # Walk → pause → look → walk
+presets.approach_and_graze(seq, duration_frames=240)
+```
 
 ## The Deer Rig
 
