@@ -34,3 +34,6 @@ Desktop.ini
 # Blender
 *.blend1
 *.blend2
+
+# Rendered output
+renders/
