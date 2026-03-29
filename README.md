@@ -29,7 +29,7 @@ Layer 2: Locomotion Engine   Pure Python — gaits, IK, spine, state machine
 Layer 1: Blender Adapter     Reads/writes bone transforms and keyframes via bpy
 ```
 
-**Layer 2 has zero Blender imports.** This is what makes the unit tests fast (~0.4s for 147 tests).
+**Layer 2 has zero Blender imports.** This is what makes the unit tests fast (~0.8s for 191 tests).
 
 ## Project Structure
 
@@ -49,6 +49,9 @@ src/deer_me/
         scene.py        Ground plane, 3-point lighting, camera
         skin.py         Mesh binding, proxy deer mesh generator
     api/            Animator-facing commands and sequencer
+        deer.py         High-level Deer class: walk(), trot(), idle(), turn()
+        sequence.py     Fluent timeline builder for scripted animations
+        presets.py      Compound behaviors: graze, startle, flee, patrol
 tests/
     unit/           Fast tests — no Blender needed
     integration/    Blender headless tests
@@ -92,8 +95,8 @@ blender --background --python scripts/run_in_blender.py -- pytest tests/integrat
 - **Phase 2** — Locomotion engine: gaits, IK solver, spine dynamics
 - **Phase 3** — State machine with cross-fade blending
 - **Phase 4** — Blender adapter (armature, keyframes, scene, skinning)
-- Phase 5 — Animator API (next)
-- Phase 6 — Polish and onboarding
+- **Phase 5** — Animator API (Deer class, sequencer, presets)
+- Phase 6 — Polish and onboarding (next)
 
 ## The Deer Rig
 
