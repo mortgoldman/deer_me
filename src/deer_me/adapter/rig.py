@@ -70,35 +70,74 @@ def create_armature(
 
     edit_bones = arm_data.edit_bones
 
+    # Place bones at world-space positions (accumulated from root).
+    # This ensures bone directions match the geometry the IK solver expects.
     for bone_name in skeleton.bone_names:
         bone_def = skeleton.bones[bone_name]
         eb = edit_bones.new(bone_name)
 
-        # Position: head is the bone's rest position relative to parent
-        pos = bone_def.rest_position
-        eb.head = mu.Vector((float(pos[0]), float(pos[1]), float(pos[2])))
+        # Head at world position
+        world_pos = skeleton.world_position(bone_name)
+        eb.head = mu.Vector((float(world_pos[0]), float(world_pos[1]), float(world_pos[2])))
 
-        # Tail extends along the bone's length (default direction: +Y in bone local)
-        # For a quadruped, legs extend downward (-Z) and spine extends forward (+Y)
-        if bone_def.length > 0:
+        # Tail: point toward the primary child if one exists in a chain,
+        # otherwise use a default direction based on the bone's role.
+        children = skeleton.children(bone_name)
+        chain_child = _get_chain_child(bone_name, children, skeleton)
+        if chain_child:
+            child_world = skeleton.world_position(chain_child)
+            eb.tail = mu.Vector((float(child_world[0]), float(child_world[1]), float(child_world[2])))
+        elif bone_def.length > 0:
             tail_offset = _bone_tail_direction(bone_name, bone_def.length)
             eb.tail = eb.head + mu.Vector(tail_offset)
         else:
-            # Root or zero-length bone — give a small default
             eb.tail = eb.head + mu.Vector((0.0, 0.05, 0.0))
+
+        # Ensure minimum bone length (Blender rejects zero-length bones)
+        if (eb.tail - eb.head).length < 0.001:
+            eb.tail = eb.head + mu.Vector((0.0, 0.0, 0.05))
 
     # Set up parent relationships
     for bone_name in skeleton.bone_names:
         bone_def = skeleton.bones[bone_name]
         if bone_def.parent is not None and bone_def.parent in edit_bones:
             edit_bones[bone_name].parent = edit_bones[bone_def.parent]
-            # Connect bones that are part of a continuous chain
-            if _should_connect(bone_name):
-                edit_bones[bone_name].use_connect = True
 
     bpy.ops.object.mode_set(mode="OBJECT")
 
     return arm_obj
+
+
+def _get_chain_child(
+    bone_name: str, children: list, skeleton: Skeleton
+) -> str | None:
+    """Find the primary chain child for a bone (used to set tail direction).
+
+    For bones with a single child that continues the chain (e.g., upper_arm → lower_arm),
+    returns that child. For branch points (e.g., spine_upper with neck + shoulders),
+    returns the main continuation or None.
+    """
+    if not children:
+        return None
+    if len(children) == 1:
+        return children[0]
+
+    # For branch points, prefer the main continuation:
+    # spine_base → spine_mid, spine_mid → spine_upper, spine_upper → neck_base
+    chain_preferences = {
+        "root": "spine_base",
+        "spine_base": "spine_mid",
+        "spine_mid": "spine_upper",
+        "spine_upper": "neck_base",
+        "neck_base": "neck_mid",
+        "neck_mid": "head",
+    }
+    if bone_name in chain_preferences:
+        preferred = chain_preferences[bone_name]
+        if preferred in children:
+            return preferred
+
+    return None
 
 
 def _bone_tail_direction(bone_name: str, length: float) -> tuple:
@@ -136,21 +175,6 @@ def _bone_tail_direction(bone_name: str, length: float) -> tuple:
 
     # Spine bones point forward
     return (0.0, length, 0.0)
-
-
-def _should_connect(bone_name: str) -> bool:
-    """Whether a bone should be connected to its parent (share head/tail)."""
-    # Chain bones that form continuous limbs
-    connected = {
-        "upper_arm_l", "lower_arm_l", "front_hoof_l",
-        "upper_arm_r", "lower_arm_r", "front_hoof_r",
-        "upper_leg_l", "lower_leg_l", "rear_hoof_l",
-        "upper_leg_r", "lower_leg_r", "rear_hoof_r",
-        "spine_mid", "spine_upper",
-        "neck_mid", "head",
-        "tail_tip",
-    }
-    return bone_name in connected
 
 
 # ---------------------------------------------------------------------------
